@@ -24,6 +24,62 @@ const TypingTest = () => {
     selectRandomParagraph();
   }, []);
 
+  
+  const handleChange = (e) => {
+    const value = e.target.value;
+    
+    // Start timer on first keypress
+    if (!isRunning) {
+      setIsRunning(true);
+    }
+    
+    if (value.length <= paragraph.length) {
+      setInput(value);
+      
+      // Count correct characters
+      let correct = 0;
+      for (let i = 0; i < value.length; i++) {
+        if (value[i] === paragraph[i]) {
+          correct++;
+        }
+      }
+      setCorrectChars(correct);
+    }
+  };
+  
+  const [result, setResult] = useState(null);
+  
+  const finishTest = useCallback (async() => {
+    setIsRunning(false);
+    setFinished(true);
+    
+    const timeElapsed = 60 - timeLeft;
+    
+    const wpm =
+    timeElapsed > 0
+    ? Math.round((correctChars / 5) / (timeElapsed / 60))
+    : 0;
+    
+    const cpm =
+    timeElapsed > 0
+    ? Math.round(correctChars / (timeElapsed / 60))
+    : 0;
+    
+    const accuracy =
+    input.length > 0
+    ? Math.round((correctChars / input.length) * 100)
+    : 0;
+    
+    const resultData = { wpm, cpm, accuracy };
+    setResult(resultData);
+    
+    try {
+      await API.post("/test/save", resultData);
+    } catch (err) {
+      console.log(err.response?.data);
+    }
+  },[timeLeft, correctChars, input]);
+  
   // Timer logic
   useEffect(() => {
     let timer;
@@ -37,7 +93,7 @@ const TypingTest = () => {
     }
 
     return () => clearTimeout(timer);
-  }, [timeLeft, isRunning]);
+  }, [timeLeft, isRunning, finishTest]);
 
   const startTest = () => {
     setInput("");
@@ -48,61 +104,6 @@ const TypingTest = () => {
     setIsRunning(false);
     textareaRef.current.focus();
   };
-
-  const handleChange = (e) => {
-    const value = e.target.value;
-
-    // Start timer on first keypress
-    if (!isRunning) {
-      setIsRunning(true);
-    }
-
-    if (value.length <= paragraph.length) {
-      setInput(value);
-
-      // Count correct characters
-      let correct = 0;
-      for (let i = 0; i < value.length; i++) {
-        if (value[i] === paragraph[i]) {
-          correct++;
-        }
-      }
-      setCorrectChars(correct);
-    }
-  };
-
-    const [result, setResult] = useState(null);
-
-    const finishTest = useCallback (async() => {
-        setIsRunning(false);
-        setFinished(true);
-
-        const timeElapsed = 60 - timeLeft;
-
-        const wpm =
-            timeElapsed > 0
-            ? Math.round((correctChars / 5) / (timeElapsed / 60))
-            : 0;
-
-        const cpm =
-            timeElapsed > 0
-            ? Math.round(correctChars / (timeElapsed / 60))
-            : 0;
-
-        const accuracy =
-            input.length > 0
-            ? Math.round((correctChars / input.length) * 100)
-            : 0;
-
-        const resultData = { wpm, cpm, accuracy };
-        setResult(resultData);
-
-        try {
-            await API.post("/test/save", resultData);
-        } catch (err) {
-            console.log(err.response?.data);
-        }
-    },[correctChars, timeLeft, input]);
      
   const renderParagraph = () => {
     return paragraph.split("").map((char, index) => {

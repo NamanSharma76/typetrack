@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback} from "react";
 import API from "../services/api";
 import Navbar from "../components/Navbar";
 import paragraphs from "../data/paragraphs";
@@ -73,36 +73,36 @@ const TypingTest = () => {
 
     const [result, setResult] = useState(null);
 
-    const finishTest = async () => {
-    setIsRunning(false);
-    setFinished(true);
+    const finishTest = useCallback (async() => {
+        setIsRunning(false);
+        setFinished(true);
 
-    const timeElapsed = 60 - timeLeft;
+        const timeElapsed = 60 - timeLeft;
 
-    const wpm =
-        timeElapsed > 0
-        ? Math.round((correctChars / 5) / (timeElapsed / 60))
-        : 0;
+        const wpm =
+            timeElapsed > 0
+            ? Math.round((correctChars / 5) / (timeElapsed / 60))
+            : 0;
 
-    const cpm =
-        timeElapsed > 0
-        ? Math.round(correctChars / (timeElapsed / 60))
-        : 0;
+        const cpm =
+            timeElapsed > 0
+            ? Math.round(correctChars / (timeElapsed / 60))
+            : 0;
 
-    const accuracy =
-        input.length > 0
-        ? Math.round((correctChars / input.length) * 100)
-        : 0;
+        const accuracy =
+            input.length > 0
+            ? Math.round((correctChars / input.length) * 100)
+            : 0;
 
-    const resultData = { wpm, cpm, accuracy };
-    setResult(resultData);
+        const resultData = { wpm, cpm, accuracy };
+        setResult(resultData);
 
-    try {
-        await API.post("/test/save", resultData);
-    } catch (err) {
-        console.log(err.response?.data);
-    }
-    };
+        try {
+            await API.post("/test/save", resultData);
+        } catch (err) {
+            console.log(err.response?.data);
+        }
+    },[correctChars, timeLeft, input]);
      
   const renderParagraph = () => {
     return paragraph.split("").map((char, index) => {

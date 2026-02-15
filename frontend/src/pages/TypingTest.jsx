@@ -1,9 +1,11 @@
-import { useEffect, useState, useRef, useCallback} from "react";
+import { useEffect, useState, useRef, useCallback, useMemo} from "react";
 import API from "../services/api";
 import Navbar from "../components/Navbar";
 import paragraphs from "../data/paragraphs";
 
+
 const TypingTest = () => {
+  const timerRef = useRef(null);
   const [timeLeft, setTimeLeft] = useState(60);
   const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -49,51 +51,54 @@ const TypingTest = () => {
   
   const [result, setResult] = useState(null);
   
-  const finishTest = useCallback (async() => {
+  const finishTest = useCallback(() => {
     setIsRunning(false);
     setFinished(true);
-    
+
     const timeElapsed = 60 - timeLeft;
-    
+
     const wpm =
-    timeElapsed > 0
-    ? Math.round((correctChars / 5) / (timeElapsed / 60))
-    : 0;
-    
+      timeElapsed > 0
+        ? Math.round((correctChars / 5) / (timeElapsed / 60))
+        : 0;
+
     const cpm =
-    timeElapsed > 0
-    ? Math.round(correctChars / (timeElapsed / 60))
-    : 0;
-    
+      timeElapsed > 0
+        ? Math.round(correctChars / (timeElapsed / 60))
+        : 0;
+
     const accuracy =
-    input.length > 0
-    ? Math.round((correctChars / input.length) * 100)
-    : 0;
-    
+      input.length > 0
+        ? Math.round((correctChars / input.length) * 100)
+        : 0;
+
     const resultData = { wpm, cpm, accuracy };
     setResult(resultData);
-    
-    try {
-      await API.post("/test/save", resultData);
-    } catch (err) {
-      console.log(err.response?.data);
-    }
-  },[timeLeft, correctChars, input]);
-  
+
+    API.post("/test/save", resultData).catch(() => {});
+  }, [timeLeft, correctChars, input]);
+
+
   // Timer logic
   useEffect(() => {
-    let timer;
-
-    if (isRunning && timeLeft > 0) {
-      timer = setTimeout(() => setTimeLeft((prev) => prev - 1), 1000);
+    if (isRunning) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            finishTest();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
 
-    if (timeLeft === 0 && isRunning) {
-      finishTest();
-    }
+    return () => clearInterval(timerRef.current);
+  }, [isRunning]);
 
-    return () => clearTimeout(timer);
-  }, [timeLeft, isRunning, finishTest]);
+
+
 
   const startTest = () => {
     setInput("");
@@ -105,7 +110,7 @@ const TypingTest = () => {
     textareaRef.current.focus();
   };
      
-  const renderParagraph = () => {
+  const renderedParagraph = useMemo(() => {
     return paragraph.split("").map((char, index) => {
       let className = "";
 
@@ -121,7 +126,8 @@ const TypingTest = () => {
         </span>
       );
     });
-  };
+  }, [paragraph, input]);
+
 
   return (
     <>
@@ -133,7 +139,7 @@ const TypingTest = () => {
           <h2>Time Left: {timeLeft}s</h2>
 
           <div className="paragraph-box">
-            {renderParagraph()}
+            {renderedParagraph}
           </div>
 
           <textarea

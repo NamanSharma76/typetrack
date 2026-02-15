@@ -1,19 +1,29 @@
-import { useEffect, useState, useRef, useCallback, useMemo} from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import API from "../services/api";
 import Navbar from "../components/Navbar";
 import paragraphs from "../data/paragraphs";
 
-
 const TypingTest = () => {
   const timerRef = useRef(null);
+  const textareaRef = useRef(null);
+
   const [timeLeft, setTimeLeft] = useState(60);
   const [input, setInput] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [paragraph, setParagraph] = useState("");
   const [correctChars, setCorrectChars] = useState(0);
+  const [result, setResult] = useState(null);
 
-  const textareaRef = useRef(null);
+  // Refs to avoid ESLint dependency issues
+  const correctCharsRef = useRef(0);
+  const inputRef = useRef("");
+
+  // Keep refs updated
+  useEffect(() => {
+    correctCharsRef.current = correctChars;
+    inputRef.current = input;
+  }, [correctChars, input]);
 
   // Select random paragraph
   const selectRandomParagraph = () => {
@@ -26,19 +36,17 @@ const TypingTest = () => {
     selectRandomParagraph();
   }, []);
 
-  
+  // Handle typing
   const handleChange = (e) => {
     const value = e.target.value;
-    
-    // Start timer on first keypress
+
     if (!isRunning) {
       setIsRunning(true);
     }
-    
+
     if (value.length <= paragraph.length) {
       setInput(value);
-      
-      // Count correct characters
+
       let correct = 0;
       for (let i = 0; i < value.length; i++) {
         if (value[i] === paragraph[i]) {
@@ -48,57 +56,51 @@ const TypingTest = () => {
       setCorrectChars(correct);
     }
   };
-  
-  const [result, setResult] = useState(null);
-  
-  const finishTest = useCallback(() => {
-    setIsRunning(false);
-    setFinished(true);
 
-    const timeElapsed = 60 - timeLeft;
-
-    const wpm =
-      timeElapsed > 0
-        ? Math.round((correctChars / 5) / (timeElapsed / 60))
-        : 0;
-
-    const cpm =
-      timeElapsed > 0
-        ? Math.round(correctChars / (timeElapsed / 60))
-        : 0;
-
-    const accuracy =
-      input.length > 0
-        ? Math.round((correctChars / input.length) * 100)
-        : 0;
-
-    const resultData = { wpm, cpm, accuracy };
-    setResult(resultData);
-
-    API.post("/test/save", resultData).catch(() => {});
-  }, [timeLeft, correctChars, input]);
-
-
-  // Timer logic
+  // Timer logic (CI-safe)
   useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            finishTest();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (!isRunning) return;
+
+    timerRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+
+          setIsRunning(false);
+          setFinished(true);
+
+          const timeElapsed = 60;
+          const chars = correctCharsRef.current;
+          const typedLength = inputRef.current.length;
+
+          const wpm =
+            timeElapsed > 0
+              ? Math.round((chars / 5) / (timeElapsed / 60))
+              : 0;
+
+          const cpm =
+            timeElapsed > 0
+              ? Math.round(chars / (timeElapsed / 60))
+              : 0;
+
+          const accuracy =
+            typedLength > 0
+              ? Math.round((chars / typedLength) * 100)
+              : 0;
+
+          const resultData = { wpm, cpm, accuracy };
+          setResult(resultData);
+
+          API.post("/test/save", resultData).catch(() => {});
+
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => clearInterval(timerRef.current);
   }, [isRunning]);
-
-
-
 
   const startTest = () => {
     setInput("");
@@ -109,13 +111,15 @@ const TypingTest = () => {
     setIsRunning(false);
     textareaRef.current.focus();
   };
-     
+
+  // Highlight rendering (optimized)
   const renderedParagraph = useMemo(() => {
     return paragraph.split("").map((char, index) => {
       let className = "";
 
       if (index < input.length) {
-        className = char === input[index] ? "correct" : "incorrect";
+        className =
+          char === input[index] ? "correct" : "incorrect";
       } else if (index === input.length) {
         className = "current";
       }
@@ -127,7 +131,6 @@ const TypingTest = () => {
       );
     });
   }, [paragraph, input]);
-
 
   return (
     <>
@@ -167,36 +170,39 @@ const TypingTest = () => {
 
           {finished && result && (
             <div className="result-overlay">
-                <div className="result-modal">
+              <div className="result-modal">
                 <h2>🎉 Test Completed!</h2>
 
                 <div className="result-stats">
-                    <div>
+                  <div>
                     <h3>{result.wpm}</h3>
                     <p>WPM</p>
-                    </div>
+                  </div>
 
-                    <div>
+                  <div>
                     <h3>{result.cpm}</h3>
                     <p>CPM</p>
-                    </div>
+                  </div>
 
-                    <div>
+                  <div>
                     <h3>{result.accuracy}%</h3>
                     <p>Accuracy</p>
-                    </div>
+                  </div>
                 </div>
 
                 <div className="result-buttons">
-                    <button onClick={startTest}>Restart</button>
-                    <button onClick={() => window.location.href="/dashboard"}>
+                  <button onClick={startTest}>Restart</button>
+                  <button
+                    onClick={() =>
+                      (window.location.href = "/dashboard")
+                    }
+                  >
                     Go to Dashboard
-                    </button>
+                  </button>
                 </div>
-                </div>
+              </div>
             </div>
-            )}
-
+          )}
         </div>
       </div>
     </>

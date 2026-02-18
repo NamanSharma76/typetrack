@@ -171,7 +171,7 @@ const TypingTest = () => {
           {finished && result && (
             <div className="result-overlay">
               <div className="result-modal">
-                <h2>🎉 Test Completed!</h2>
+                <h2> Test Completed!</h2>
 
                 <div className="result-stats">
                   <div>
